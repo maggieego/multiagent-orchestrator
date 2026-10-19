@@ -1,40 +1,41 @@
-from typing import Dict, Any
+import math
+from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.tools import tool
 
-# Base de datos simulada de métricas de mercado/tecnología
-MOCK_METRICS_DB: Dict[str, Dict[str, Any]] = {
-    "langgraph": {
-        "adopcion_empresarion": "84%",
-        "consultas_mensuales": 1200000,
-        "satisfaccion_devs": "92%",
-        "errores_frecuentes": ["Supervisor infinito", "Límites de recursión no manejados"]
-    },
-    "sistemas_multiagente": {
-        "crecimiento_anual": "145%",
-        "casos_uso_principales": ["Atención al cliente", "Análisis financiero", "Investigación autónoma"],
-        "eficiencia_vs_monolitico": "+38%"
-    }
-}
+# ==========================================
+# 1. HERRAMIENTAS DEL INVESTIGADOR
+# ==========================================
+search_tool = DuckDuckGoSearchRun()
 
 @tool
-def buscar_informacion_mercado(tema: str) -> str:
-    """
-    Busca métricas, datos estadísticos e información relevante sobre un tema de tecnología o mercado.
-    
-    Args:
-        tema (str): El tema o tecnología a consultar (ej. 'langgraph', 'sistemas_multiagente').
-    """
-    key = tema.lower().replace(" ", "_")
-    if key in MOCK_METRICS_DB:
-        return f"Resultados para '{tema}': {MOCK_METRICS_DB[key]}"
-    return f"Se encontraron datos generales sobre {tema}: 'Alta demanda en proyectos de IA en 2026, con foco en arquitectura ReAct y orquestación jerárquica'."
+def internal_knowledge_retriever(query: str) -> str:
+    """Consulta la base de conocimientos interna sobre arquitectura de agentes y LangGraph."""
+    return f"Resultado interno para '{query}': LangGraph soporta patrones jerárquicos (Supervisor-Workers) y ReAct loops."
+
+investigador_tools = [search_tool, internal_knowledge_retriever]
+
+
+# ==========================================
+# 2. HERRAMIENTAS DEL ANALISTA
+# ==========================================
+@tool
+def calculator_tool(expression: str) -> str:
+    """Evalúa expresiones matemáticas o estadísticas simples (ej. '100 * 1.425')."""
+    try:
+        allowed_names = {"math": math, "abs": abs, "round": round}
+        code = compile(expression, "<string>", "eval")
+        for name in code.co_names:
+            if name not in allowed_names:
+                raise NameError(f"Uso no permitido de '{name}'")
+        result = eval(code, {"__builtins__": {}}, allowed_names)
+        return f"Resultado del cálculo: {result}"
+    except Exception as e:
+        return f"Error en la evaluación: {str(e)}"
 
 @tool
-def calcular_metricas_rendimiento(datos_numericos: str) -> str:
-    """
-    Procesa un texto o lista de datos numéricos para calcular promedios, porcentajes de incremento y resúmenes cuantitativos.
-    
-    Args:
-        datos_numericos (str): Texto que contiene datos o valores cuantitativos a analizar.
-    """
-    return f"Análisis Cómputo/Estadístico completado sobre [{datos_numericos}]: Promedio de crecimiento proyectado: +42.5%, Nivel de confianza: 95%."
+def text_stats_tool(text: str) -> str:
+    """Analiza métricas de texto: conteo de palabras, caracteres y densidad."""
+    words = text.split()
+    return f"Estadísticas -> Palabras: {len(words)}, Caracteres: {len(text)}"
+
+analista_tools = [calculator_tool, text_stats_tool]

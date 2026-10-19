@@ -1,6 +1,6 @@
 # Orquestador Multi-Agente Jerárquico de Análisis e Investigación
 
-Este proyecto implementa una arquitectura **Multi-Agente Jerárquica** con un nodo **Supervisor** central que coordina las tareas entre especialistas en **Investigación** y **Análisis Cómputo**.
+Este proyecto implementa una arquitectura **Multi-Agente Jerárquica** con un nodo **Supervisor** central que coordina las tareas entre especialistas en **Investigación** y **Análisis Cómputo**, utilizando **LangGraph** y ejecución autónoma mediante patrones **ReAct**.
 
 ## Diagrama Mermaid del Grafo
 
@@ -20,25 +20,15 @@ graph TD
 
 ## Justificación de la Topología Elegida
 
-Se seleccionó una **Topología Jerárquica (Hub-and-Spoke / Supervisor-Workers)** por los siguientes motivos de arquitectura de software:
+Se seleccionó una **Topología Jerárquica (Hub-and-Spoke / Supervisor-Workers)** por los siguientes motivos de arquitectura de software y requerimientos técnicos del sistema:
 
-1. **Desacoplamiento y Especialización Estricta:** 
-   Cada agente especialista (`Investigador` y `Analista`) opera como una unidad con responsabilidad única (SRP). El investigador se enfoca exclusivamente en consumir herramientas externas y recolectar datos, mientras que el analista procesa esa información sin preocuparse por la fase de recolección.
-2. **Control Centralizado y Validación:** 
-   Al hacer que todas las aristas de retorno pasen obligatoriamente por el **Supervisor**, nos aseguramos de que haya un nodo de validación en cada iteración. El supervisor evalúa el grado de suficiencia de la respuesta antes de dar paso al siguiente especialista o dar por finalizada la tarea (`FINISH`).
-3. **Escalabilidad:** 
-   Esta topología permite agregar nuevos agentes especialistas (por ejemplo, un *Agente Redactor* o un *Agente de Validación de Código*) simplemente agregando el nodo al grafo y añadiendo la opción de ruteo en la arista condicional del Supervisor, sin romper la lógica existente.
+1. **Desacoplamiento y Especialización Estricta con Herramientas Exclusivas:** 
+   Cada agente especialista (`Investigador` y `Analista`) opera como una unidad con responsabilidad única (SRP) y cuenta con un ciclo autónomo ReAct (`create_react_agent`):
+   * **Investigador:** Configurado exclusivamente con herramientas de búsqueda web (`DuckDuckGoSearchRun`) y recuperación de conocimiento interno para recolectar datos crudos y certeros desde el exterior.
+   * **Analista:** Configurado exclusivamente con herramientas de cómputo y procesamiento (`calculator_tool`, `text_stats_tool`) para transformar, calcular o evaluar métricas sobre la información ya recolectada, sin realizar tareas de búsqueda web.
 
----
+2. **Control Centralizado y Enrutamiento Estructurado Tipado:** 
+   El **Supervisor** centraliza las decisiones de delegación eliminando comparaciones de texto plano frágiles o propensas a errores. Utiliza **salida estructurada forzada con Pydantic (`with_structured_output` y `Literal`)**, garantizando que las transiciones entre nodos sean estrictamente tipadas, deterministas y validadas en tiempo de ejecución.
 
-## 🔀 Manejo de Conflictos y Prevención de Bucles
-
-Para prevenir errores comunes en sistemas multi-agente, se implementaron dos estrategias clave:
-
-### 1. Prevención del "Supervisor Infinito" (Bucles Eternos)
-* **Contador de Pasos (`step_count`):** El estado compartido `TeamState` mantiene un contador de iteraciones. Si el grafo alcanza un límite prudencial de ejecuciones (`step_count >= 5`), la arista condicional fuerza la salida directa hacia `FINISH` independientemente de la respuesta del modelo, evitando costos excesivos en la API o bloqueos infinitos.
-* **Criterio de Suficiencia Estricto:** El prompt del Supervisor valida explícitamente los campos del estado (`research_data` y `analysis_data`). Si ambos campos están presentes, el ruteador devuelve `FINISH` de forma inmediata.
-
-### 2. Aislamiento de Estado y Contaminación de Contexto
-* En lugar de pasar todo el historial de metadatos a todos los nodos, utilizamos campos dedicados en `TeamState` para almacenar únicamente los artefactos de salida de cada especialista (`research_data` y `analysis_data`).
-* Cada agente especialista recibe solo la instrucción específica que necesita para operar, reduciendo la latencia y la confusión del modelo (*context clutter*).
+3. **Escalabilidad y Extensibilidad del Sistema:** 
+   Esta topología permite escalar el proyecto de manera modular y limpia. Agregar un nuevo especialista (por ejemplo, un agente de validación o redacción) solo requiere definir sus herramientas particulares, sumarlo como nodo al grafo y extender las opciones permitidas en el esquema `Literal` del supervisor, sin alterar la lógica de los agentes existentes.
